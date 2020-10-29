@@ -27,7 +27,7 @@ proc sort data=dat1; by key;run;
 data t_wide;
 	merge t_bop t_pi t_cal t_gr t_pd;
 	by key;
-run;/*912筆資料=3648/4*/
+run;/*1008筆資料=4032/4*/
 
 /*對應test_tooth*/
 proc sort data=t_wide; by key;run;
@@ -71,26 +71,26 @@ run;
 %group(BOP);%group(PI);
 %group(CAL);%group(GR);%group(PD);
 
-data test;merge test_bop test_pi test_cal test_gr test_pd;by key2;run;/*456*/
-data control;merge control_bop control_pi control_cal control_gr control_pd;by key2;run;/*456*/
+data test;merge test_bop test_pi test_cal test_gr test_pd;by key2;run;/*504*/
+data control;merge control_bop control_pi control_cal control_gr control_pd;by key2;run;/*504*/
 
 data t;set test;key=No_||site||pos1||pos2;drop key2;run;
 proc sort data=t;by key;run;
 data c;set control;key=No_||site||pos1||pos2;drop key2;run;
 proc sort data=c;by key;run;
 
-/*都配對成功的話應只有456筆，表示有些未配對成功*/
+/*都配對成功的話應只有504筆，表示有些未配對成功*/
 data final;
 merge t c;
 by key;
-run;/*510*/
+run;/*558*/
 
 /*有配對成功的*/
 data f1;
 merge t(in=A) c(in=B);
 by key;
 if A & B;
-run;/*402*/
+run;/*450*/
 
 /*沒配對成功的*/
 data f2;set final;
@@ -125,11 +125,12 @@ data final_v2;
 set f1 new_f2;
 by key;
 drop pos1 pos2 key;
-run;/*456*/
+run;/*504*/
 /*********************************************/
 data final_v2;set final_v2;key_tooth=No_||t1;run; /*tooth-level*/
 /*存永久檔*/
 data b.final_v2; set final_v2;run;
+data final_v2; set b.final_v2;run;
 
 *(D)算平均數;
 proc sql;
@@ -156,8 +157,9 @@ data summ;
 merge all_M_c(in=A) ff(in=B);
 by key_tooth;
 if A & B;
-run;/*76=456/6*/
+run;/*84=504/6*/
 
+data b.summ;set summ;run;
 /***********************************************************************************/
 *(E)連續變項：算和第一個時間點相比的difference;
 %macro diff(par,var);
@@ -212,3 +214,111 @@ run;
 /*存永久檔*/
 libname b 'D:\重要備份\Wang\data';
 data b.diff_dis; set work.diff_dis;run;
+
+*(G)類別變項;
+/*然後BOP跟PI過往的paper只有在各個時間點的百分比，
+ex: 受試者Ａ在baseline時 60個牙面有牙菌斑/總牙面120面(假設20顆牙x6個面)，
+那他的PI就是50%。然後去平均所有受試者得到一個PI跟BOP的普及率*/
+data final_v3;set final_v2
+(rename=(BOP_t1_g1=BOP_t1_g11 BOP_t2_g1=BOP_t2_g11 BOP_t3_g1=BOP_t3_g11 BOP_t4_g1=BOP_t4_g11
+PI_t1_g1=PI_t1_g11 PI_t2_g1=PI_t2_g11 PI_t3_g1=PI_t3_g11 PI_t4_g1=PI_t4_g11
+BOP_t1_g0=BOP_t1_g01 BOP_t2_g0=BOP_t2_g01 BOP_t3_g0=BOP_t3_g01 BOP_t4_g0=BOP_t4_g01
+PI_t1_g0=PI_t1_g01 PI_t2_g0=PI_t2_g01 PI_t3_g0=PI_t3_g01 PI_t4_g0=PI_t4_g01));
+
+BOP_t1_g1=input(BOP_t1_g11,1.);BOP_t2_g1=input(BOP_t2_g11,1.);BOP_t3_g1=input(BOP_t3_g11,1.);BOP_t4_g1=input(BOP_t4_g11,1.);
+PI_t1_g1=input(PI_t1_g11,1.);PI_t2_g1=input(PI_t2_g11,1.);PI_t3_g1=input(PI_t3_g11,1.);PI_t4_g1=input(PI_t4_g11,1.);
+
+BOP_t1_g0=input(BOP_t1_g01,1.);BOP_t2_g0=input(BOP_t2_g01,1.);BOP_t3_g0=input(BOP_t3_g01,1.);BOP_t4_g0=input(BOP_t4_g01,1.);
+PI_t1_g0=input(PI_t1_g01,1.);PI_t2_g0=input(PI_t2_g01,1.);PI_t3_g0=input(PI_t3_g01,1.);PI_t4_g0=input(PI_t4_g01,1.);
+
+drop BOP_t1_g11 BOP_t2_g11 BOP_t3_g11 BOP_t4_g11 PI_t1_g11 PI_t2_g11 PI_t3_g11 PI_t4_g11
+BOP_t1_g01 BOP_t2_g01 BOP_t3_g01 BOP_t4_g01 PI_t1_g01 PI_t2_g01 PI_t3_g01 PI_t4_g01;
+run;
+
+proc sql;
+	create table dis_BOP_t1_g1 as
+	select No_, count(No_) as denominaotr, sum(BOP_t1_g1) as num_BOP_t1_g1,
+	sum(BOP_t1_g0) as num_BOP_t1_g0
+	from final_v3
+	where BOP_t1_g1^=. /*or BOP_t1_g0^=. */
+	group by No_;
+quit;
+
+%macro summ(var,time);
+proc sql;
+	create table dis_&var._t&time. as
+	select No_, count(No_) as denominaotr, sum(&var._t&time._g1) as num_&var._t&time._g1,
+	sum(&var._t&time._g0) as num_&var._t&time._g0
+	from final_v3
+	where &var._t&time._g1^=.
+	group by No_;
+quit;
+proc sql;
+	create table &var._t&time. as
+	select No_, num_&var._t&time._g1/denominaotr as &var._t&time._g1,
+	num_&var._t&time._g0/denominaotr as &var._t&time._g0
+	from dis_&var._t&time.;
+quit;
+%mend;
+%summ(BOP,1);%summ(BOP,2);%summ(BOP,3);%summ(BOP,4);
+%summ(PI,1);%summ(PI,2);%summ(PI,3);%summ(PI,4);
+
+
+%macro summary(var,t);
+	proc sql;
+		create table a_&var._t&t. as
+		select sum(&var._t&t._g1) as a, sum(&var._t&t._g0) as b, count(No_) as c, 
+			   sum(&var._t&t._g1)/count(No_) as g1, 
+			   sum(&var._t&t._g0)/count(No_) as g0,
+			   &t. as time, "&var." as var format=$5.
+		from &var._t&t.;
+	quit;
+%mend;
+%summary(BOP,1);%summary(BOP,2);%summary(BOP,3);%summary(BOP,4);
+%summary(PI,1);%summary(PI,2);%summary(PI,3);%summary(PI,4);
+
+data discrete;
+	set a_BOP_t1 a_BOP_t2 a_BOP_t3 a_BOP_t4
+		a_PI_t1 a_PI_t2 a_PI_t3 a_PI_t4;
+	by time;
+run;
+
+PROC EXPORT DATA= WORK.Discrete 
+            OUTFILE= "D:\重要備份\Wang\data\discrete.csv" 
+            DBMS=CSV REPLACE;
+     PUTNAMES=YES;
+RUN;
+
+/*
+proc sql;
+	create table a_BOP_t1 as
+	select sum(BOP_t1_g1) as a, count(No_) as b, 
+		   sum(BOP_t1_g1)/count(No_) as M_BOP_t1_g1,
+		   sum(BOP_t1_g0) as c, sum(BOP_t1_g0)/count(No_) as M_BOP_t1_g0,
+		   1 as time
+	from BOP_t1;
+quit;
+
+
+num_BOP_t1_g1/denominaotr as BOP_t1_g1,
+	num_BOP_t1_g0/denominaotr as BOP_t1_g0
+
+proc sql;
+	create table dis_BOP_t2_g1 as
+	select No_, count(No_) as denominator, sum(BOP_t2_g1) as numerator_BOP_t2
+	from final_v3
+	where BOP_t2_g1^=.
+	group by No_;
+quit;
+
+discrete
+ 
+
+proc sql;
+	create table try as
+	select No_, count(No_) as denominator, 
+sum(BOP_t1_g1) as BOP_t1_g1, sum(BOP_t2_g1) as BOP_t2_g1, 
+sum(BOP_t3_g1) as BOP_t3_g1, sum(BOP_t4_g1) as BOP_t4_g1
+	from final_v3
+	group by No_;
+quit;*/

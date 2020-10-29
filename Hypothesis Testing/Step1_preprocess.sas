@@ -112,7 +112,7 @@ data dat;
 merge id(in=A) part(in=B);
 by No_;
 if A & B;
-run;/*3648µ§Æ[´ú­È*/
+run;/*4032µ§Æ[´ú­È*/
 
 data b.dat;set dat;run;
 data dat;set b.dat;run;

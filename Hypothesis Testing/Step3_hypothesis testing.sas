@@ -15,7 +15,7 @@ run;
 %pt(pd0,pd1);
 
 /*check normality assumption*/
-data c;set diff_con;d=d41_pd0 - d41_pd1;run;
+data c;set diff_con;d=d21_cal0 - d21_cal1;run;
 proc univariate data = c normal ;
 var d;
 qqplot;
@@ -29,6 +29,13 @@ d41=d41_pd0 - d41_pd1;
 run;
 proc univariate data=pd;
   var d21 d31 d41;
+run;
+
+data gr;set diff_con;
+d21=d21_gr0 - d21_gr1;
+run;
+proc univariate data=gr;
+  var d21;
 run;
 
 /*mean change*/
@@ -46,7 +53,9 @@ run;
 proc univariate data=diff_con;
 	var d21_pd0 d21_pd1 d31_pd0 d31_pd1 d41_pd0 d41_pd1;
 run;
-
+proc univariate data=diff_con;
+	var d21_gr0 d21_gr1;
+run;
 
 /*讀永久檔*/
 libname b 'D:\重要備份\Wang\data';
